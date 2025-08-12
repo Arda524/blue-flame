@@ -41,8 +41,8 @@ const FireballCanvas: React.FC = () => {
     // Emitter and mouse tracking
     const state = {
       time: 0,
-      mouseX: window.innerWidth / 2,
-      mouseY: window.innerHeight / 2,
+      pointerX: window.innerWidth / 2,
+      pointerY: window.innerHeight / 2,
       targetX: window.innerWidth / 2,
       targetY: window.innerHeight / 2,
       lastMove: performance.now(),
@@ -50,12 +50,16 @@ const FireballCanvas: React.FC = () => {
       emitterY: window.innerHeight / 2,
       vx: 0,
       vy: 0,
+      prev: performance.now(),
       idleThreshold: 380, // ms without movement -> idle/upward
+    } as {
+      time: number; pointerX: number; pointerY: number; targetX: number; targetY: number;
+      lastMove: number; emitterX: number; emitterY: number; vx: number; vy: number; prev: number; idleThreshold: number;
     };
 
     const onMove = (e: MouseEvent) => {
-      state.targetX = e.clientX;
-      state.targetY = e.clientY;
+      state.pointerX = e.clientX;
+      state.pointerY = e.clientY;
       state.lastMove = performance.now();
     };
 
@@ -78,7 +82,10 @@ const FireballCanvas: React.FC = () => {
     const spawnParticles = (count: number, idle: boolean) => {
       for (let i = 0; i < count; i++) {
         const angleBase = Math.atan2(state.vy, state.vx);
-        const jitter = (Math.random() - 0.5) * (idle ? 0.4 : 0.8);
+        const spd = Math.hypot(state.vx, state.vy);
+        const speedFactor = Math.min(1, spd / 10);
+        const jitterRange = idle ? 0.35 : 0.8 - 0.5 * speedFactor; // less spread at high speeds
+        const jitter = (Math.random() - 0.5) * jitterRange;
         const angle = idle
           ? -Math.PI / 2 + jitter // straight up with small spread
           : angleBase + jitter; // follow motion vector
@@ -86,9 +93,11 @@ const FireballCanvas: React.FC = () => {
         const speed = idle ? (0.6 + Math.random() * 0.6) : (0.8 + Math.random() * 1.2);
         const size = idle ? (3 + Math.random() * 4) : (3 + Math.random() * 5);
 
+        const posJitter = idle ? 4 : 10 - 6 * speedFactor; // tighter origin when fast
+
         particles.push({
-          x: state.emitterX + (Math.random() - 0.5) * (idle ? 4 : 10),
-          y: state.emitterY + (Math.random() - 0.5) * (idle ? 4 : 10),
+          x: state.emitterX + (Math.random() - 0.5) * posJitter,
+          y: state.emitterY + (Math.random() - 0.5) * posJitter,
           vx: Math.cos(angle) * speed * (prefersReducedMotion ? 0.6 : 1),
           vy: Math.sin(angle) * speed * (prefersReducedMotion ? 0.6 : 1),
           life: 0,
@@ -102,15 +111,27 @@ const FireballCanvas: React.FC = () => {
     const tick = (now: number) => {
       state.time = now;
 
-      // Ease emitter toward target (gentle pull)
-      const dt = 1 / 60; // assume ~60fps for integrator feel
-      const follow = prefersReducedMotion ? 0.05 : 0.12;
+      // Smooth target toward pointer to prevent jitter
+      state.targetX += (state.pointerX - state.targetX) * 0.25;
+      state.targetY += (state.pointerY - state.targetY) * 0.25;
+
+      // Ease emitter toward target (gentle pull) with damping and velocity clamp
+      const damping = 0.88;
+      const follow = prefersReducedMotion ? 0.045 : 0.09;
       const dx = state.targetX - state.emitterX;
       const dy = state.targetY - state.emitterY;
-      state.vx = state.vx * 0.85 + dx * follow * (prefersReducedMotion ? 0.85 : 1);
-      state.vy = state.vy * 0.85 + dy * follow * (prefersReducedMotion ? 0.85 : 1);
-      state.emitterX += state.vx * dt * 60;
-      state.emitterY += state.vy * dt * 60;
+      state.vx = state.vx * damping + dx * follow;
+      state.vy = state.vy * damping + dy * follow;
+      // Clamp speed to reduce shake at high cursor speeds
+      const maxV = prefersReducedMotion ? 7 : 10;
+      const sp = Math.hypot(state.vx, state.vy);
+      if (sp > maxV) {
+        const s = maxV / sp;
+        state.vx *= s;
+        state.vy *= s;
+      }
+      state.emitterX += state.vx;
+      state.emitterY += state.vy;
 
       const idle = now - state.lastMove > state.idleThreshold;
 
@@ -126,16 +147,20 @@ const FireballCanvas: React.FC = () => {
       // Draw particles with additive blending for glow
       ctx.globalCompositeOperation = "lighter";
 
-      // Flicker factor from time
-      const flicker = 0.85 + Math.sin(now * 0.005) * 0.05 + (Math.random() - 0.5) * 0.04;
+      // Flicker factor from time (less random at high speeds to avoid visual shaking)
+      const emitterSpeed = Math.hypot(state.vx, state.vy);
+      const randAmp = emitterSpeed > 6 ? 0.015 : 0.04;
+      const flicker = 0.85 + Math.sin(now * 0.005) * 0.05 + (Math.random() - 0.5) * randAmp;
 
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.life += 16; // ~ms per frame approximation
 
-        // Upward buoyancy and slight curl noise
-        const noise = Math.sin((p.seed + now) * 0.002) * 0.2;
-        p.vx += (idle ? noise * 0.15 : noise * 0.25);
+        // Upward buoyancy and slight curl noise (reduce lateral noise when moving fast)
+        const noiseBase = Math.sin((p.seed + now) * 0.002) * 0.2;
+        const moveNoiseScale = 1 - Math.min(0.7, emitterSpeed / 12);
+        const lateralNoise = idle ? noiseBase * 0.15 : noiseBase * (0.25 * moveNoiseScale);
+        p.vx += lateralNoise;
         p.vy += idle ? -0.008 : -0.004; // buoyancy stronger when idle (calm rise)
 
         // Integrate
