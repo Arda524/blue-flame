@@ -1,11 +1,5 @@
 import React, { useEffect, useRef } from "react";
 
-// FireballCanvas
-// - Blue mystical fireball follows the cursor with gentle easing
-// - Leaves a soft, ethereal trail
-// - When cursor stops, flame burns straight upward calmly
-// - Subtle flicker and glow throughout
-// - Respects prefers-reduced-motion
 const FireballCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationRef = useRef<number | null>(null);
