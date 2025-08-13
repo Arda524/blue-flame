@@ -34,20 +34,32 @@ const StarfieldCanvas: React.FC = () => {
       brightness: number;
       twinkleSpeed: number;
       twinkleOffset: number;
+      color: string;
+      pulsePhase: number;
     };
 
     const stars: Star[] = [];
-    const numStars = prefersReducedMotion ? 80 : 150;
+    const numStars = prefersReducedMotion ? 120 : 200;
 
-    // Generate stars
+    // Generate stars with varied colors
+    const starColors = [
+      'rgba(255, 255, 255, ',
+      'rgba(200, 220, 255, ',
+      'rgba(255, 220, 200, ',
+      'rgba(180, 200, 255, ',
+      'rgba(255, 200, 180, ',
+    ];
+
     for (let i = 0; i < numStars; i++) {
       stars.push({
         x: Math.random() * window.innerWidth,
         y: Math.random() * window.innerHeight,
-        size: Math.random() * 2 + 0.5,
-        brightness: Math.random() * 0.8 + 0.2,
-        twinkleSpeed: Math.random() * 0.02 + 0.005,
+        size: Math.random() * 3 + 0.5,
+        brightness: Math.random() * 0.9 + 0.1,
+        twinkleSpeed: Math.random() * 0.03 + 0.005,
         twinkleOffset: Math.random() * Math.PI * 2,
+        color: starColors[Math.floor(Math.random() * starColors.length)],
+        pulsePhase: Math.random() * Math.PI * 2,
       });
     }
 
@@ -56,23 +68,46 @@ const StarfieldCanvas: React.FC = () => {
     const tick = (now: number) => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw stars
+      // Draw nebula-like background
+      const nebulaGradient = ctx.createRadialGradient(
+        window.innerWidth * 0.3, window.innerHeight * 0.4, 0,
+        window.innerWidth * 0.3, window.innerHeight * 0.4, window.innerWidth * 0.8
+      );
+      nebulaGradient.addColorStop(0, 'rgba(20, 30, 80, 0.15)');
+      nebulaGradient.addColorStop(0.5, 'rgba(40, 20, 60, 0.08)');
+      nebulaGradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+      
+      ctx.fillStyle = nebulaGradient;
+      ctx.fillRect(0, 0, window.innerWidth, window.innerHeight);
+
+      // Draw stars with enhanced effects
       stars.forEach((star) => {
-        const twinkle = Math.sin(now * star.twinkleSpeed + star.twinkleOffset) * 0.3 + 0.7;
-        const alpha = star.brightness * twinkle * 0.8;
+        const twinkle = Math.sin(now * star.twinkleSpeed + star.twinkleOffset) * 0.4 + 0.6;
+        const pulse = Math.sin(now * 0.001 + star.pulsePhase) * 0.2 + 0.8;
+        const alpha = star.brightness * twinkle * pulse * 0.9;
         
+        // Main star glow
         const gradient = ctx.createRadialGradient(
           star.x, star.y, 0,
-          star.x, star.y, star.size * 3
+          star.x, star.y, star.size * 4
         );
-        gradient.addColorStop(0, `rgba(255, 255, 255, ${alpha})`);
-        gradient.addColorStop(0.5, `rgba(200, 220, 255, ${alpha * 0.6})`);
-        gradient.addColorStop(1, `rgba(150, 180, 255, 0)`);
+        gradient.addColorStop(0, star.color + `${alpha})`);
+        gradient.addColorStop(0.3, star.color + `${alpha * 0.7})`);
+        gradient.addColorStop(0.7, star.color + `${alpha * 0.3})`);
+        gradient.addColorStop(1, star.color + '0)');
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(star.x, star.y, star.size * 3, 0, Math.PI * 2);
+        ctx.arc(star.x, star.y, star.size * 4, 0, Math.PI * 2);
         ctx.fill();
+
+        // Bright core
+        if (star.brightness > 0.7) {
+          ctx.fillStyle = star.color + `${alpha * 1.2})`);
+          ctx.beginPath();
+          ctx.arc(star.x, star.y, star.size * 0.8, 0, Math.PI * 2);
+          ctx.fill();
+        }
       });
 
       animationRef.current = requestAnimationFrame(tick);

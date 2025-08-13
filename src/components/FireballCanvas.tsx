@@ -27,9 +27,20 @@ const FireballCanvas: React.FC = () => {
       "(prefers-reduced-motion: reduce)"
     ).matches;
 
-    const hue = 210; // Blue fire hue
+    // Dynamic color system
+    const colorModes = [
+      { name: 'ethereal', hue: 210, sat: 90, light: 70 }, // Blue
+      { name: 'mystical', hue: 280, sat: 85, light: 65 }, // Purple
+      { name: 'celestial', hue: 180, sat: 80, light: 75 }, // Cyan
+      { name: 'phoenix', hue: 30, sat: 95, light: 60 },   // Orange
+      { name: 'emerald', hue: 150, sat: 85, light: 65 },  // Green
+    ];
 
-    // Emitter and mouse tracking
+    let currentColorMode = 0;
+    let colorTransition = 0;
+    let lastColorChange = 0;
+
+    // Enhanced emitter state
     const state = {
       time: 0,
       pointerX: window.innerWidth / 2,
@@ -41,16 +52,40 @@ const FireballCanvas: React.FC = () => {
       emitterY: window.innerHeight / 2,
       vx: 0,
       vy: 0,
-      idleThreshold: 380, // ms without movement -> idle/upward
+      idleThreshold: 380,
+      intensity: 1,
+      trailParticles: [] as Array<{x: number, y: number, life: number, size: number}>,
     };
 
     const onMove = (e: MouseEvent) => {
       state.pointerX = e.clientX;
       state.pointerY = e.clientY;
       state.lastMove = performance.now();
+      
+      // Add trail particles
+      if (state.trailParticles.length < 20) {
+        state.trailParticles.push({
+          x: state.emitterX,
+          y: state.emitterY,
+          life: 0,
+          size: 3 + Math.random() * 4
+        });
+      }
+    };
+
+    const onClick = () => {
+      // Burst effect on click
+      state.intensity = 3;
+      setTimeout(() => { state.intensity = 1; }, 500);
+      
+      // Change color mode
+      currentColorMode = (currentColorMode + 1) % colorModes.length;
+      colorTransition = 0;
+      lastColorChange = performance.now();
     };
 
     window.addEventListener("mousemove", onMove);
+    window.addEventListener("click", onClick);
     window.addEventListener("resize", resize);
 
     type Particle = {
@@ -62,35 +97,52 @@ const FireballCanvas: React.FC = () => {
       maxLife: number;
       size: number;
       seed: number;
+      type: 'fire' | 'spark' | 'ember';
+      hue: number;
     };
 
     const particles: Particle[] = [];
 
     const spawnParticles = (count: number, idle: boolean) => {
-      for (let i = 0; i < count; i++) {
+      const adjustedCount = Math.floor(count * state.intensity);
+      
+      for (let i = 0; i < adjustedCount; i++) {
         const angleBase = Math.atan2(state.vy, state.vx);
         const spd = Math.hypot(state.vx, state.vy);
         const speedFactor = Math.min(1, spd / 10);
-        const jitterRange = idle ? 0.35 : 0.8 - 0.5 * speedFactor; // less spread at high speeds
+        const jitterRange = idle ? 0.4 : 0.9 - 0.5 * speedFactor;
         const jitter = (Math.random() - 0.5) * jitterRange;
         const angle = idle
-          ? -Math.PI / 2 + jitter // straight up with small spread
-          : angleBase + jitter; // follow motion vector
+          ? -Math.PI / 2 + jitter
+          : angleBase + jitter;
 
-        const speed = idle ? (0.6 + Math.random() * 0.6) : (0.8 + Math.random() * 1.2);
-        const size = idle ? (5 + Math.random() * 6) : (5 + Math.random() * 8); // Bigger particles
+        const speed = idle ? (0.8 + Math.random() * 0.8) : (1.0 + Math.random() * 1.5);
+        const size = idle ? (6 + Math.random() * 8) : (6 + Math.random() * 10);
 
-        const posJitter = idle ? 4 : 10 - 6 * speedFactor; // tighter origin when fast
+        const posJitter = idle ? 6 : 12 - 8 * speedFactor;
+
+        // Determine particle type
+        const rand = Math.random();
+        let type: 'fire' | 'spark' | 'ember';
+        if (rand < 0.7) type = 'fire';
+        else if (rand < 0.9) type = 'spark';
+        else type = 'ember';
+
+        const currentColor = colorModes[currentColorMode];
+        const hueVariation = type === 'spark' ? 40 : 20;
+        const particleHue = currentColor.hue + (Math.random() - 0.5) * hueVariation;
 
         particles.push({
           x: state.emitterX + (Math.random() - 0.5) * posJitter,
           y: state.emitterY + (Math.random() - 0.5) * posJitter,
-          vx: Math.cos(angle) * speed * (prefersReducedMotion ? 0.6 : 1),
-          vy: Math.sin(angle) * speed * (prefersReducedMotion ? 0.6 : 1),
+          vx: Math.cos(angle) * speed * (prefersReducedMotion ? 0.7 : 1),
+          vy: Math.sin(angle) * speed * (prefersReducedMotion ? 0.7 : 1),
           life: 0,
-          maxLife: idle ? (420 + Math.random() * 280) : (300 + Math.random() * 240),
-          size,
+          maxLife: type === 'ember' ? (600 + Math.random() * 400) : (350 + Math.random() * 300),
+          size: type === 'spark' ? size * 0.6 : size,
           seed: Math.random() * 1000,
+          type,
+          hue: particleHue,
         });
       }
     };
@@ -98,19 +150,24 @@ const FireballCanvas: React.FC = () => {
     const tick = (now: number) => {
       state.time = now;
 
-      // Smooth target toward pointer to prevent jitter
-      state.targetX += (state.pointerX - state.targetX) * 0.25;
-      state.targetY += (state.pointerY - state.targetY) * 0.25;
+      // Color transition
+      if (now - lastColorChange < 1000) {
+        colorTransition = Math.min(1, (now - lastColorChange) / 1000);
+      }
 
-      // Ease emitter toward target (gentle pull) with damping and velocity clamp
-      const damping = 0.88;
-      const follow = prefersReducedMotion ? 0.035 : 0.07;
+      // Smooth target toward pointer
+      state.targetX += (state.pointerX - state.targetX) * 0.3;
+      state.targetY += (state.pointerY - state.targetY) * 0.3;
+
+      // Enhanced emitter movement
+      const damping = 0.9;
+      const follow = prefersReducedMotion ? 0.04 : 0.08;
       const dx = state.targetX - state.emitterX;
       const dy = state.targetY - state.emitterY;
       state.vx = state.vx * damping + dx * follow;
       state.vy = state.vy * damping + dy * follow;
-      // Clamp speed to reduce shake at high cursor speeds
-      const maxV = prefersReducedMotion ? 6 : 8;
+      
+      const maxV = prefersReducedMotion ? 7 : 9;
       const sp = Math.hypot(state.vx, state.vy);
       if (sp > maxV) {
         const s = maxV / sp;
@@ -120,63 +177,112 @@ const FireballCanvas: React.FC = () => {
       state.emitterX += state.vx;
       state.emitterY += state.vy;
 
-      const idle = now - state.lastMove > state.idleThreshold;
+      // Update trail particles
+      state.trailParticles.forEach((trail, i) => {
+        trail.life += 16;
+        if (trail.life > 200) {
+          state.trailParticles.splice(i, 1);
+        }
+      });
 
-      // Spawn rate and behavior
-      const baseRate = prefersReducedMotion ? 15 : 35; // More particles for bigger fire
-      const rate = idle ? baseRate * 0.9 : baseRate;
+      const idle = now - state.lastMove > state.idleThreshold;
+      const baseRate = prefersReducedMotion ? 20 : 45;
+      const rate = idle ? baseRate * 0.8 : baseRate;
       spawnParticles(rate, idle);
 
       ctx.globalCompositeOperation = "source-over";
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      // Draw particles with additive blending for glow
+      // Draw trail
       ctx.globalCompositeOperation = "lighter";
+      state.trailParticles.forEach(trail => {
+        const alpha = (1 - trail.life / 200) * 0.3;
+        const currentColor = colorModes[currentColorMode];
+        
+        const gradient = ctx.createRadialGradient(
+          trail.x, trail.y, 0,
+          trail.x, trail.y, trail.size * 2
+        );
+        gradient.addColorStop(0, `hsla(${currentColor.hue}, 80%, 80%, ${alpha})`);
+        gradient.addColorStop(1, `hsla(${currentColor.hue}, 60%, 60%, 0)`);
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(trail.x, trail.y, trail.size * 2, 0, Math.PI * 2);
+        ctx.fill();
+      });
 
-      // Flicker factor from time (less random at high speeds to avoid visual shaking)
+      // Enhanced flicker
       const emitterSpeed = Math.hypot(state.vx, state.vy);
-      const randAmp = emitterSpeed > 6 ? 0.015 : 0.04;
-      const flicker = 0.85 + Math.sin(now * 0.005) * 0.05 + (Math.random() - 0.5) * randAmp;
+      const randAmp = emitterSpeed > 8 ? 0.02 : 0.06;
+      const flicker = 0.9 + Math.sin(now * 0.008) * 0.08 + (Math.random() - 0.5) * randAmp;
 
+      // Draw particles with enhanced effects
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
         p.life += 16;
 
-        // Upward buoyancy and slight curl noise (reduce lateral noise when moving fast)
-        const noiseBase = Math.sin((p.seed + now) * 0.002) * 0.2;
-        const moveNoiseScale = 1 - Math.min(0.7, emitterSpeed / 12);
-        const lateralNoise = idle ? noiseBase * 0.15 : noiseBase * (0.25 * moveNoiseScale);
+        // Enhanced physics
+        const noiseBase = Math.sin((p.seed + now) * 0.003) * 0.25;
+        const moveNoiseScale = 1 - Math.min(0.8, emitterSpeed / 15);
+        const lateralNoise = idle ? noiseBase * 0.2 : noiseBase * (0.3 * moveNoiseScale);
+        
         p.vx += lateralNoise;
-        p.vy += idle ? -0.008 : -0.004; // buoyancy stronger when idle (calm rise)
+        p.vy += (idle ? -0.012 : -0.008) * (p.type === 'ember' ? 0.5 : 1);
 
-        // Integrate
+        // Gravity and air resistance
+        p.vx *= 0.998;
+        p.vy *= 0.995;
+
         p.x += p.vx;
         p.y += p.vy;
 
-        // Life and removal
         if (p.life > p.maxLife) {
           particles.splice(i, 1);
           continue;
         }
 
-        // Render
+        // Enhanced rendering
         const t = p.life / p.maxLife;
-        const alpha = (1 - t) * 0.28 * flicker; // Slightly more visible
-        if (alpha <= 0.002) continue;
+        let alpha = (1 - t) * 0.4 * flicker;
+        
+        if (p.type === 'spark') alpha *= 1.5;
+        else if (p.type === 'ember') alpha *= 0.8;
+        
+        if (alpha <= 0.003) continue;
 
-        const inner = Math.max(0, 1 - t * 1.2);
-        const size = p.size * (0.8 + inner * 1.0); // Bigger rendered size
+        const inner = Math.max(0, 1 - t * 1.3);
+        let size = p.size * (0.9 + inner * 1.2);
+        
+        if (p.type === 'spark') size *= 0.7;
+        else if (p.type === 'ember') size *= 1.3;
 
-        // Color ramp: white core -> cyan -> azure blue
-        const sat = 90 - t * 40; // saturation reduces slightly
-        const light = 70 - t * 35; // gets darker toward the edges
-        const color = `hsla(${hue}, ${sat}%, ${light}%, ${alpha})`;
+        // Enhanced color system
+        const currentColor = colorModes[currentColorMode];
+        const sat = currentColor.sat - t * 30;
+        const light = currentColor.light - t * 25;
+        
+        let coreColor, midColor, edgeColor;
+        
+        if (p.type === 'spark') {
+          coreColor = `hsla(${p.hue}, 100%, 95%, ${alpha * 1.2})`;
+          midColor = `hsla(${p.hue}, ${sat + 10}%, ${light + 15}%, ${alpha})`;
+          edgeColor = `hsla(${p.hue + 15}, ${sat}%, ${light}%, ${alpha * 0.5})`;
+        } else if (p.type === 'ember') {
+          coreColor = `hsla(${p.hue}, ${sat + 20}%, ${light + 10}%, ${alpha})`;
+          midColor = `hsla(${p.hue}, ${sat}%, ${light - 10}%, ${alpha * 0.8})`;
+          edgeColor = `hsla(${p.hue - 10}, ${sat - 20}%, ${light - 20}%, ${alpha * 0.3})`;
+        } else {
+          coreColor = `hsla(${p.hue}, 100%, 90%, ${alpha})`;
+          midColor = `hsla(${p.hue}, ${sat}%, ${light}%, ${alpha * 0.9})`;
+          edgeColor = `hsla(${p.hue + 10}, ${sat - 10}%, ${light - 10}%, ${alpha * 0.4})`;
+        }
 
         const gradient = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, size);
-        gradient.addColorStop(0, `hsla(${hue}, 100%, 95%, ${alpha})`);
-        gradient.addColorStop(0.3, `hsla(${hue}, 98%, 70%, ${alpha * 0.9})`);
-        gradient.addColorStop(0.7, color);
-        gradient.addColorStop(1, `hsla(${hue + 10}, 90%, 50%, 0)`);
+        gradient.addColorStop(0, coreColor);
+        gradient.addColorStop(0.4, midColor);
+        gradient.addColorStop(0.8, edgeColor);
+        gradient.addColorStop(1, `hsla(${p.hue}, 50%, 30%, 0)`);
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
@@ -184,23 +290,33 @@ const FireballCanvas: React.FC = () => {
         ctx.fill();
       }
 
-      // Core orb that follows the pointer (subtle)
-      const coreSize = (prefersReducedMotion ? 8 : 12) + Math.sin(now * 0.01) * 1.0; // Bigger core
+      // Enhanced core orb
+      const currentColor = colorModes[currentColorMode];
+      const coreSize = (prefersReducedMotion ? 12 : 16) + Math.sin(now * 0.015) * 2;
+      const coreIntensity = 0.6 + Math.sin(now * 0.01) * 0.2;
+      
       const coreGrad = ctx.createRadialGradient(
         state.emitterX,
         state.emitterY,
         0,
         state.emitterX,
         state.emitterY,
-        coreSize * 4
+        coreSize * 5
       );
-      coreGrad.addColorStop(0, `hsla(${hue}, 100%, 96%, 0.35)`);
-      coreGrad.addColorStop(0.4, `hsla(${hue}, 100%, 60%, 0.18)`);
-      coreGrad.addColorStop(1, `hsla(${hue}, 100%, 50%, 0)`);
+      coreGrad.addColorStop(0, `hsla(${currentColor.hue}, 100%, 95%, ${coreIntensity * 0.8})`);
+      coreGrad.addColorStop(0.3, `hsla(${currentColor.hue}, 90%, 70%, ${coreIntensity * 0.4})`);
+      coreGrad.addColorStop(0.7, `hsla(${currentColor.hue}, 80%, 50%, ${coreIntensity * 0.2})`);
+      coreGrad.addColorStop(1, `hsla(${currentColor.hue}, 70%, 40%, 0)`);
+      
       ctx.fillStyle = coreGrad;
       ctx.beginPath();
-      ctx.arc(state.emitterX, state.emitterY, coreSize * 4, 0, Math.PI * 2);
+      ctx.arc(state.emitterX, state.emitterY, coreSize * 5, 0, Math.PI * 2);
       ctx.fill();
+
+      // Intensity decay
+      if (state.intensity > 1) {
+        state.intensity = Math.max(1, state.intensity - 0.02);
+      }
 
       animationRef.current = requestAnimationFrame(tick);
     };
@@ -210,6 +326,7 @@ const FireballCanvas: React.FC = () => {
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
       window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("click", onClick);
       window.removeEventListener("resize", resize);
     };
   }, []);
