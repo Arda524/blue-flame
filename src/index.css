@@ -5,12 +5,10 @@
 @layer base {
   :root {
     --background: 0 0% 0%;
-    --fire-hue: 210;
   }
   
   .dark {
     --background: 0 0% 0%;
-    --fire-hue: 200;
   }
 }
 

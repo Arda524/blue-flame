@@ -27,10 +27,7 @@ const FireballCanvas: React.FC = () => {
       "(prefers-reduced-motion: reduce)"
     ).matches;
 
-    // Read design tokens for hue
-    const styles = getComputedStyle(document.documentElement);
-    const fireHueVar = styles.getPropertyValue("--fire-hue").trim();
-    const hue = fireHueVar ? parseFloat(fireHueVar) : 210; // fallback to blue hue
+    const hue = 210; // Blue fire hue
 
     // Emitter and mouse tracking
     const state = {
@@ -44,11 +41,7 @@ const FireballCanvas: React.FC = () => {
       emitterY: window.innerHeight / 2,
       vx: 0,
       vy: 0,
-      prev: performance.now(),
       idleThreshold: 380, // ms without movement -> idle/upward
-    } as {
-      time: number; pointerX: number; pointerY: number; targetX: number; targetY: number;
-      lastMove: number; emitterX: number; emitterY: number; vx: number; vy: number; prev: number; idleThreshold: number;
     };
 
     const onMove = (e: MouseEvent) => {
@@ -85,7 +78,7 @@ const FireballCanvas: React.FC = () => {
           : angleBase + jitter; // follow motion vector
 
         const speed = idle ? (0.6 + Math.random() * 0.6) : (0.8 + Math.random() * 1.2);
-        const size = idle ? (3 + Math.random() * 4) : (3 + Math.random() * 5);
+        const size = idle ? (5 + Math.random() * 6) : (5 + Math.random() * 8); // Bigger particles
 
         const posJitter = idle ? 4 : 10 - 6 * speedFactor; // tighter origin when fast
 
@@ -130,11 +123,10 @@ const FireballCanvas: React.FC = () => {
       const idle = now - state.lastMove > state.idleThreshold;
 
       // Spawn rate and behavior
-      const baseRate = prefersReducedMotion ? 10 : 28;
+      const baseRate = prefersReducedMotion ? 15 : 35; // More particles for bigger fire
       const rate = idle ? baseRate * 0.9 : baseRate;
       spawnParticles(rate, idle);
 
-      // Clear with slight alpha to keep glow accumulation soft, but avoid ghosting
       ctx.globalCompositeOperation = "source-over";
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -148,7 +140,7 @@ const FireballCanvas: React.FC = () => {
 
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
-        p.life += 16; // ~ms per frame approximation
+        p.life += 16;
 
         // Upward buoyancy and slight curl noise (reduce lateral noise when moving fast)
         const noiseBase = Math.sin((p.seed + now) * 0.002) * 0.2;
@@ -169,11 +161,11 @@ const FireballCanvas: React.FC = () => {
 
         // Render
         const t = p.life / p.maxLife;
-        const alpha = (1 - t) * 0.22 * flicker; // fade out
+        const alpha = (1 - t) * 0.28 * flicker; // Slightly more visible
         if (alpha <= 0.002) continue;
 
         const inner = Math.max(0, 1 - t * 1.2);
-        const size = p.size * (0.6 + inner * 0.8);
+        const size = p.size * (0.8 + inner * 1.0); // Bigger rendered size
 
         // Color ramp: white core -> cyan -> azure blue
         const sat = 90 - t * 40; // saturation reduces slightly
@@ -193,7 +185,7 @@ const FireballCanvas: React.FC = () => {
       }
 
       // Core orb that follows the pointer (subtle)
-      const coreSize = (prefersReducedMotion ? 6 : 8) + Math.sin(now * 0.01) * 0.6;
+      const coreSize = (prefersReducedMotion ? 8 : 12) + Math.sin(now * 0.01) * 1.0; // Bigger core
       const coreGrad = ctx.createRadialGradient(
         state.emitterX,
         state.emitterY,
