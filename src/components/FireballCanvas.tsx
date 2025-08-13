@@ -104,13 +104,13 @@ const FireballCanvas: React.FC = () => {
 
       // Ease emitter toward target (gentle pull) with damping and velocity clamp
       const damping = 0.88;
-      const follow = prefersReducedMotion ? 0.045 : 0.09;
+      const follow = prefersReducedMotion ? 0.025 : 0.05;
       const dx = state.targetX - state.emitterX;
       const dy = state.targetY - state.emitterY;
       state.vx = state.vx * damping + dx * follow;
       state.vy = state.vy * damping + dy * follow;
       // Clamp speed to reduce shake at high cursor speeds
-      const maxV = prefersReducedMotion ? 7 : 10;
+      const maxV = prefersReducedMotion ? 5 : 7;
       const sp = Math.hypot(state.vx, state.vy);
       if (sp > maxV) {
         const s = maxV / sp;
