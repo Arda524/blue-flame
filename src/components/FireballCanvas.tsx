@@ -28,7 +28,7 @@ const FireballCanvas: React.FC = () => {
     ).matches;
 
     // Dynamic color system
-    const fireColor = { hue: 30, sat: 95, light: 60 }; // Orange fire
+    const fireColor = { hue: 220, sat: 95, light: 60 }; // Blue fire
 
     // Enhanced emitter state
     const state = {
