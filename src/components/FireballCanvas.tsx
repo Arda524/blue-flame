@@ -161,13 +161,13 @@ const FireballCanvas: React.FC = () => {
 
       // Enhanced emitter movement
       const damping = 0.9;
-      const follow = prefersReducedMotion ? 0.04 : 0.08;
+      const follow = prefersReducedMotion ? 0.08 : 0.15;
       const dx = state.targetX - state.emitterX;
       const dy = state.targetY - state.emitterY;
       state.vx = state.vx * damping + dx * follow;
       state.vy = state.vy * damping + dy * follow;
       
-      const maxV = prefersReducedMotion ? 7 : 9;
+      const maxV = prefersReducedMotion ? 10 : 15;
       const sp = Math.hypot(state.vx, state.vy);
       if (sp > maxV) {
         const s = maxV / sp;
