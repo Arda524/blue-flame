@@ -28,17 +28,7 @@ const FireballCanvas: React.FC = () => {
     ).matches;
 
     // Dynamic color system
-    const colorModes = [
-      { name: 'ethereal', hue: 210, sat: 90, light: 70 }, // Blue
-      { name: 'mystical', hue: 280, sat: 85, light: 65 }, // Purple
-      { name: 'celestial', hue: 180, sat: 80, light: 75 }, // Cyan
-      { name: 'phoenix', hue: 30, sat: 95, light: 60 },   // Orange
-      { name: 'emerald', hue: 150, sat: 85, light: 65 },  // Green
-    ];
-
-    let currentColorMode = 0;
-    let colorTransition = 0;
-    let lastColorChange = 0;
+    const fireColor = { hue: 30, sat: 95, light: 60 }; // Orange fire
 
     // Enhanced emitter state
     const state = {
@@ -77,11 +67,6 @@ const FireballCanvas: React.FC = () => {
       // Burst effect on click
       state.intensity = 3;
       setTimeout(() => { state.intensity = 1; }, 500);
-      
-      // Change color mode
-      currentColorMode = (currentColorMode + 1) % colorModes.length;
-      colorTransition = 0;
-      lastColorChange = performance.now();
     };
 
     window.addEventListener("mousemove", onMove);
@@ -128,9 +113,8 @@ const FireballCanvas: React.FC = () => {
         else if (rand < 0.9) type = 'spark';
         else type = 'ember';
 
-        const currentColor = colorModes[currentColorMode];
         const hueVariation = type === 'spark' ? 40 : 20;
-        const particleHue = currentColor.hue + (Math.random() - 0.5) * hueVariation;
+        const particleHue = fireColor.hue + (Math.random() - 0.5) * hueVariation;
 
         particles.push({
           x: state.emitterX + (Math.random() - 0.5) * posJitter,
@@ -149,11 +133,6 @@ const FireballCanvas: React.FC = () => {
 
     const tick = (now: number) => {
       state.time = now;
-
-      // Color transition
-      if (now - lastColorChange < 1000) {
-        colorTransition = Math.min(1, (now - lastColorChange) / 1000);
-      }
 
       // Smooth target toward pointer
       state.targetX += (state.pointerX - state.targetX) * 0.3;
@@ -197,14 +176,13 @@ const FireballCanvas: React.FC = () => {
       ctx.globalCompositeOperation = "lighter";
       state.trailParticles.forEach(trail => {
         const alpha = (1 - trail.life / 200) * 0.3;
-        const currentColor = colorModes[currentColorMode];
         
         const gradient = ctx.createRadialGradient(
           trail.x, trail.y, 0,
           trail.x, trail.y, trail.size * 2
         );
-        gradient.addColorStop(0, `hsla(${currentColor.hue}, 80%, 80%, ${alpha})`);
-        gradient.addColorStop(1, `hsla(${currentColor.hue}, 60%, 60%, 0)`);
+        gradient.addColorStop(0, `hsla(${fireColor.hue}, 80%, 80%, ${alpha})`);
+        gradient.addColorStop(1, `hsla(${fireColor.hue}, 60%, 60%, 0)`);
         
         ctx.fillStyle = gradient;
         ctx.beginPath();
@@ -258,9 +236,8 @@ const FireballCanvas: React.FC = () => {
         else if (p.type === 'ember') size *= 1.0;
 
         // Enhanced color system
-        const currentColor = colorModes[currentColorMode];
-        const sat = currentColor.sat - t * 30;
-        const light = currentColor.light - t * 25;
+        const sat = fireColor.sat - t * 30;
+        const light = fireColor.light - t * 25;
         
         let coreColor, midColor, edgeColor;
         
@@ -291,7 +268,6 @@ const FireballCanvas: React.FC = () => {
       }
 
       // Enhanced core orb
-      const currentColor = colorModes[currentColorMode];
       const coreSize = (prefersReducedMotion ? 8 : 12) + Math.sin(now * 0.015) * 1.5;
       const coreIntensity = 0.6 + Math.sin(now * 0.01) * 0.2;
       
@@ -303,10 +279,10 @@ const FireballCanvas: React.FC = () => {
         state.emitterY,
         coreSize * 3
       );
-      coreGrad.addColorStop(0, `hsla(${currentColor.hue}, 100%, 95%, ${coreIntensity * 0.8})`);
-      coreGrad.addColorStop(0.3, `hsla(${currentColor.hue}, 90%, 70%, ${coreIntensity * 0.4})`);
-      coreGrad.addColorStop(0.7, `hsla(${currentColor.hue}, 80%, 50%, ${coreIntensity * 0.2})`);
-      coreGrad.addColorStop(1, `hsla(${currentColor.hue}, 70%, 40%, 0)`);
+      coreGrad.addColorStop(0, `hsla(${fireColor.hue}, 100%, 95%, ${coreIntensity * 0.8})`);
+      coreGrad.addColorStop(0.3, `hsla(${fireColor.hue}, 90%, 70%, ${coreIntensity * 0.4})`);
+      coreGrad.addColorStop(0.7, `hsla(${fireColor.hue}, 80%, 50%, ${coreIntensity * 0.2})`);
+      coreGrad.addColorStop(1, `hsla(${fireColor.hue}, 70%, 40%, 0)`);
       
       ctx.fillStyle = coreGrad;
       ctx.beginPath();
