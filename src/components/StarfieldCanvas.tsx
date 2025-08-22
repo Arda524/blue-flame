@@ -95,6 +95,10 @@ const StarfieldCanvas: React.FC = () => {
         gradient.addColorStop(0.3, star.color + `${alpha * 0.7})`);
         gradient.addColorStop(0.7, star.color + `${alpha * 0.3})`);
         gradient.addColorStop(1, star.color + '0)');
+        gradient.addColorStop(0, star.color + alpha + ')');
+        gradient.addColorStop(0.3, star.color + (alpha * 0.7) + ')');
+        gradient.addColorStop(0.7, star.color + (alpha * 0.3) + ')');
+        gradient.addColorStop(1, star.color + '0)');
 
         ctx.fillStyle = gradient;
         ctx.beginPath();
@@ -103,7 +107,7 @@ const StarfieldCanvas: React.FC = () => {
 
         // Bright core
         if (star.brightness > 0.7) {
-          ctx.fillStyle = star.color + `${alpha * 1.2})`);
+          ctx.fillStyle = star.color + (alpha * 1.2) + ')';
           ctx.beginPath();
           ctx.arc(star.x, star.y, star.size * 0.8, 0, Math.PI * 2);
           ctx.fill();
