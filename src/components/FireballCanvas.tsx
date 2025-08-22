@@ -117,7 +117,7 @@ const FireballCanvas: React.FC = () => {
           : angleBase + jitter;
 
         const speed = idle ? (0.8 + Math.random() * 0.8) : (1.0 + Math.random() * 1.5);
-        const size = idle ? (6 + Math.random() * 8) : (6 + Math.random() * 10);
+        const size = idle ? (4 + Math.random() * 6) : (4 + Math.random() * 8);
 
         const posJitter = idle ? 6 : 12 - 8 * speedFactor;
 
@@ -254,8 +254,8 @@ const FireballCanvas: React.FC = () => {
         const inner = Math.max(0, 1 - t * 1.3);
         let size = p.size * (0.9 + inner * 1.2);
         
-        if (p.type === 'spark') size *= 0.7;
-        else if (p.type === 'ember') size *= 1.3;
+        if (p.type === 'spark') size *= 0.5;
+        else if (p.type === 'ember') size *= 1.0;
 
         // Enhanced color system
         const currentColor = colorModes[currentColorMode];
@@ -292,7 +292,7 @@ const FireballCanvas: React.FC = () => {
 
       // Enhanced core orb
       const currentColor = colorModes[currentColorMode];
-      const coreSize = (prefersReducedMotion ? 12 : 16) + Math.sin(now * 0.015) * 2;
+      const coreSize = (prefersReducedMotion ? 8 : 12) + Math.sin(now * 0.015) * 1.5;
       const coreIntensity = 0.6 + Math.sin(now * 0.01) * 0.2;
       
       const coreGrad = ctx.createRadialGradient(
@@ -301,7 +301,7 @@ const FireballCanvas: React.FC = () => {
         0,
         state.emitterX,
         state.emitterY,
-        coreSize * 5
+        coreSize * 3
       );
       coreGrad.addColorStop(0, `hsla(${currentColor.hue}, 100%, 95%, ${coreIntensity * 0.8})`);
       coreGrad.addColorStop(0.3, `hsla(${currentColor.hue}, 90%, 70%, ${coreIntensity * 0.4})`);
@@ -310,7 +310,7 @@ const FireballCanvas: React.FC = () => {
       
       ctx.fillStyle = coreGrad;
       ctx.beginPath();
-      ctx.arc(state.emitterX, state.emitterY, coreSize * 5, 0, Math.PI * 2);
+      ctx.arc(state.emitterX, state.emitterY, coreSize * 3, 0, Math.PI * 2);
       ctx.fill();
 
       // Intensity decay
