@@ -45,7 +45,13 @@ const FireballCanvas: React.FC = () => {
       idleThreshold: 380,
       intensity: 1,
       trailParticles: [] as Array<{x: number, y: number, life: number, size: number}>,
+      isMobile: /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent),
+      isTouch: 'ontouchstart' in window,
     };
+
+    // Mobile-specific scaling
+    const mobileScale = state.isMobile ? 0.6 : 1;
+    const particleScale = state.isMobile ? 0.7 : 1;
 
     const onMove = (e: MouseEvent) => {
       state.pointerX = e.clientX;
@@ -53,23 +59,57 @@ const FireballCanvas: React.FC = () => {
       state.lastMove = performance.now();
       
       // Add trail particles
-      if (state.trailParticles.length < 20) {
+      const maxTrailParticles = state.isMobile ? 10 : 20;
+      if (state.trailParticles.length < maxTrailParticles) {
         state.trailParticles.push({
           x: state.emitterX,
           y: state.emitterY,
           life: 0,
-          size: 3 + Math.random() * 4
+          size: (3 + Math.random() * 4) * particleScale
         });
+      }
+    };
+
+    const onTouchMove = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length > 0) {
+        const touch = e.touches[0];
+        state.pointerX = touch.clientX;
+        state.pointerY = touch.clientY;
+        state.lastMove = performance.now();
+        
+        // Add trail particles for touch
+        const maxTrailParticles = 10;
+        if (state.trailParticles.length < maxTrailParticles) {
+          state.trailParticles.push({
+            x: state.emitterX,
+            y: state.emitterY,
+            life: 0,
+            size: (2 + Math.random() * 3) * particleScale
+          });
+        }
+      }
+    };
+
+    const onTouchStart = (e: TouchEvent) => {
+      e.preventDefault();
+      if (e.touches.length > 0) {
+        const touch = e.touches[0];
+        state.pointerX = touch.clientX;
+        state.pointerY = touch.clientY;
+        state.lastMove = performance.now();
       }
     };
 
     const onClick = () => {
       // Burst effect on click
-      state.intensity = 3;
-      setTimeout(() => { state.intensity = 1; }, 500);
+      state.intensity = state.isMobile ? 2 : 3;
+      setTimeout(() => { state.intensity = 1; }, state.isMobile ? 300 : 500);
     };
 
     window.addEventListener("mousemove", onMove);
+    window.addEventListener("touchmove", onTouchMove, { passive: false });
+    window.addEventListener("touchstart", onTouchStart, { passive: false });
     window.addEventListener("click", onClick);
     window.addEventListener("resize", resize);
 
@@ -89,7 +129,7 @@ const FireballCanvas: React.FC = () => {
     const particles: Particle[] = [];
 
     const spawnParticles = (count: number, idle: boolean) => {
-      const adjustedCount = Math.floor(count * state.intensity);
+      const adjustedCount = Math.floor(count * state.intensity * particleScale);
       
       for (let i = 0; i < adjustedCount; i++) {
         const angleBase = Math.atan2(state.vy, state.vx);
@@ -101,10 +141,12 @@ const FireballCanvas: React.FC = () => {
           ? -Math.PI / 2 + jitter
           : angleBase + jitter;
 
-        const speed = idle ? (0.8 + Math.random() * 0.8) : (1.0 + Math.random() * 1.5);
-        const size = idle ? (4 + Math.random() * 6) : (4 + Math.random() * 8);
+        const baseSpeed = idle ? (0.8 + Math.random() * 0.8) : (1.0 + Math.random() * 1.5);
+        const speed = baseSpeed * (state.isMobile ? 0.8 : 1);
+        const baseSize = idle ? (4 + Math.random() * 6) : (4 + Math.random() * 8);
+        const size = baseSize * particleScale;
 
-        const posJitter = idle ? 6 : 12 - 8 * speedFactor;
+        const posJitter = (idle ? 6 : 12 - 8 * speedFactor) * mobileScale;
 
         // Determine particle type
         const rand = Math.random();
@@ -122,7 +164,7 @@ const FireballCanvas: React.FC = () => {
           vx: Math.cos(angle) * speed * (prefersReducedMotion ? 0.7 : 1),
           vy: Math.sin(angle) * speed * (prefersReducedMotion ? 0.7 : 1),
           life: 0,
-          maxLife: type === 'ember' ? (600 + Math.random() * 400) : (350 + Math.random() * 300),
+          maxLife: (type === 'ember' ? (600 + Math.random() * 400) : (350 + Math.random() * 300)) * (state.isMobile ? 0.8 : 1),
           size: type === 'spark' ? size * 0.6 : size,
           seed: Math.random() * 1000,
           type,
@@ -140,13 +182,13 @@ const FireballCanvas: React.FC = () => {
 
       // Enhanced emitter movement with smoother damping
       const damping = 0.95;
-      const follow = prefersReducedMotion ? 0.06 : 0.08;
+      const follow = prefersReducedMotion ? 0.06 : (state.isMobile ? 0.12 : 0.08);
       const dx = state.targetX - state.emitterX;
       const dy = state.targetY - state.emitterY;
       state.vx = state.vx * damping + dx * follow;
       state.vy = state.vy * damping + dy * follow;
       
-      const maxV = prefersReducedMotion ? 10 : 15;
+      const maxV = prefersReducedMotion ? 10 : (state.isMobile ? 12 : 15);
       const sp = Math.hypot(state.vx, state.vy);
       if (sp > maxV) {
         const s = maxV / sp;
@@ -159,13 +201,14 @@ const FireballCanvas: React.FC = () => {
       // Update trail particles
       state.trailParticles.forEach((trail, i) => {
         trail.life += 16;
-        if (trail.life > 200) {
+        const maxTrailLife = state.isMobile ? 150 : 200;
+        if (trail.life > maxTrailLife) {
           state.trailParticles.splice(i, 1);
         }
       });
 
       const idle = now - state.lastMove > state.idleThreshold;
-      const baseRate = prefersReducedMotion ? 20 : 45;
+      const baseRate = prefersReducedMotion ? 20 : (state.isMobile ? 25 : 45);
       const rate = idle ? baseRate * 0.8 : baseRate;
       spawnParticles(rate, idle);
 
@@ -175,18 +218,19 @@ const FireballCanvas: React.FC = () => {
       // Draw trail
       ctx.globalCompositeOperation = "lighter";
       state.trailParticles.forEach(trail => {
-        const alpha = (1 - trail.life / 200) * 0.3;
+        const maxTrailLife = state.isMobile ? 150 : 200;
+        const alpha = (1 - trail.life / maxTrailLife) * (state.isMobile ? 0.2 : 0.3);
         
         const gradient = ctx.createRadialGradient(
           trail.x, trail.y, 0,
-          trail.x, trail.y, trail.size * 2
+          trail.x, trail.y, trail.size * (state.isMobile ? 1.5 : 2)
         );
         gradient.addColorStop(0, `hsla(${fireColor.hue}, 80%, 80%, ${alpha})`);
         gradient.addColorStop(1, `hsla(${fireColor.hue}, 60%, 60%, 0)`);
         
         ctx.fillStyle = gradient;
         ctx.beginPath();
-        ctx.arc(trail.x, trail.y, trail.size * 2, 0, Math.PI * 2);
+        ctx.arc(trail.x, trail.y, trail.size * (state.isMobile ? 1.5 : 2), 0, Math.PI * 2);
         ctx.fill();
       });
 
@@ -268,7 +312,8 @@ const FireballCanvas: React.FC = () => {
       }
 
       // Enhanced core orb
-      const coreSize = (prefersReducedMotion ? 8 : 12) + Math.sin(now * 0.015) * 1.5;
+      const baseCoreSize = prefersReducedMotion ? 8 : (state.isMobile ? 8 : 12);
+      const coreSize = (baseCoreSize + Math.sin(now * 0.015) * 1.5) * mobileScale;
       const coreIntensity = 0.6 + Math.sin(now * 0.01) * 0.2;
       
       const coreGrad = ctx.createRadialGradient(
@@ -302,6 +347,8 @@ const FireballCanvas: React.FC = () => {
     return () => {
       if (animationRef.current) cancelAnimationFrame(animationRef.current);
       window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("touchmove", onTouchMove);
+      window.removeEventListener("touchstart", onTouchStart);
       window.removeEventListener("click", onClick);
       window.removeEventListener("resize", resize);
     };
