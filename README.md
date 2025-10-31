@@ -1,4 +1,5 @@
-# 🔥 Blue Flame
+# 🔥 Blue Flame 
+
 
 A mesmerizing interactive fireball animation built with React, TypeScript, and HTML5 Canvas. Experience a dynamic blue flame that follows your cursor or finger with smooth, physics-based particle effects.
 
